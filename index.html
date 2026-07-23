@@ -3076,7 +3076,64 @@ avatarImg.src = window.globalAvatarCache[handleText];
 
         }, 2000);
     
-           
+             // --- 52. NATIVE PHONE BACK BUTTON FIX (NO HUNTING) ---
+        setTimeout(() => {
+            // 1. Push an initial "Home" state to the phone's history
+            history.pushState({ page: 'home' }, '', window.location.href);
+
+            // 2. Listen for the physical Back Button press
+            window.addEventListener('popstate', function(event) {
+                let intercepted = false;
+
+                // A. Close Verification or Edit Modals
+                const modals = [document.getElementById('verificationModal'), document.getElementById('editProfileModal')];
+                modals.forEach(modal => {
+                    if (modal && modal.style.display === 'flex') {
+                        modal.style.display = 'none';
+                        intercepted = true;
+                    }
+                });
+
+                // B. Close Chat or Public Profile Overlays
+                const overlays = [document.getElementById('chatOverlay'), document.getElementById('publicProfileOverlay')];
+                overlays.forEach(overlay => {
+                    if (overlay && overlay.classList.contains('active')) {
+                        overlay.classList.remove('active');
+                        intercepted = true;
+                    }
+                });
+
+                // C. If no modals are open, check if we are on a different tab. If so, go Home.
+                if (!intercepted) {
+                    const homeTab = document.getElementById('homeTab');
+                    if (homeTab && homeTab.style.display === 'none') {
+                        const homeIcon = document.querySelector('.fa-house');
+                        if (homeIcon && homeIcon.parentElement) {
+                            homeIcon.parentElement.click();
+                            intercepted = true;
+                        }
+                    }
+                }
+
+                // D. If we intercepted the back button, push a new state so they don't exit on the next press
+                if (intercepted) {
+                    history.pushState({ page: 'app' }, '', window.location.href);
+                }
+            });
+
+            // 3. Whenever you click a menu button or open a profile, add a "step" to the phone's history
+            document.addEventListener('click', function(e) {
+                const isNav = e.target.closest('.nav-item');
+                const isProfilePic = e.target.closest('.profile-avatar-large');
+                const isEditBtn = e.target.closest('.btn-edit-profile');
+                const isAvatarClick = e.target.closest('.avatar');
+                
+                if (isNav || isProfilePic || isEditBtn || isAvatarClick) {
+                    history.pushState({ page: 'app' }, '', window.location.href);
+                }
+            });
+        }, 1000);
+      
 </script>
 
 
