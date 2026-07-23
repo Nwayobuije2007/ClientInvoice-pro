@@ -3251,7 +3251,55 @@ avatarImg.src = window.globalAvatarCache[handleText];
                 });
             }
         }, 2000);
+        // --- 55. GLOBAL DELETE BUTTON FIX (NO HUNTING) ---
+        setTimeout(() => {
+            // Create a bulletproof, globally accessible delete function
+            window.deletePost = function(postId, buttonElement) {
+                // 1. Security Check: Make sure you are logged in
+                if (!window.currentUser || !window.currentUser.handle) {
+                    alert("Security Alert: You must be logged in to delete posts.");
+                    return;
+                }
 
+                // 2. Premium Confirmation
+                const isSure = confirm("Are you sure you want to permanently delete this post from the global feed?");
+                if (!isSure) return;
+
+                // 3. Delete from Firebase
+                if (typeof db !== 'undefined') {
+                    db.collection("global_posts").doc(postId).delete().then(() => {
+                        console.log("Post successfully vaporized from Firebase.");
+                        
+                        // 4. Smoothly animate it off the screen for a premium feel
+                        if (buttonElement) {
+                            const postCard = buttonElement.closest('.post-card');
+                            if (postCard) {
+                                postCard.style.transition = "all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+                                postCard.style.opacity = "0";
+                                postCard.style.transform = "scale(0.8)";
+                                setTimeout(() => postCard.remove(), 300);
+                            }
+                        }
+                    }).catch((error) => {
+                        console.error("Error deleting post: ", error);
+                        alert("Could not delete post. You can only delete your own posts!");
+                    });
+                }
+            };
+
+            // 5. Fallback Scanner: Ensure all trash cans are clickable
+            setInterval(() => {
+                const trashIcons = document.querySelectorAll('.fa-trash');
+                trashIcons.forEach(icon => {
+                    if (icon.style.cursor !== 'pointer') {
+                        icon.style.cursor = 'pointer';
+                    }
+                });
+            }, 1000);
+
+        }, 1500);
+
+</script>
 </body>
 </html>
 
