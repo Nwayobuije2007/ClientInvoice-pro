@@ -3136,6 +3136,121 @@ avatarImg.src = window.globalAvatarCache[handleText];
       
 </script>
 
+        // --- 53. TRUE MULTIPLAYER IDENTITY & STATS FIX ---
+        setTimeout(() => {
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                firebase.auth().onAuthStateChanged((user) => {
+                    if (user) {
+                        // Create a unique handle based on their email (e.g., john@gmail.com -> @john)
+                        const userHandle = "@" + user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+                        
+                        db.collection("users").doc(userHandle).get().then((doc) => {
+                            if (doc.exists) {
+                                // Welcome back! Load their real data
+                                window.currentUser = doc.data();
+                                window.currentUser.handle = userHandle;
+                            } else {
+                                // Brand new user (like your brother)! Give them a fresh account.
+                                window.currentUser = {
+                                    name: user.displayName || "New User",
+                                    handle: userHandle,
+                                    avatar: user.photoURL || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80",
+                                    bio: "Just joined Signature.",
+                                    followers: [],
+                                    following: [],
+                                    isVerified: false
+                                };
+                                db.collection("users").doc(userHandle).set(window.currentUser);
+                            }
+                            
+                            // Save to their phone memory
+                            localStorage.setItem('sig_user', JSON.stringify(window.currentUser));
+                            
+                            // INSTANTLY OVERWRITE THE FAKE HTML WITH THEIR REAL DATA
+                            const pName = document.getElementById('profileName');
+                            if (pName) pName.innerHTML = window.currentUser.name + (window.currentUser.isVerified ? ' <i class="fa-solid fa-certificate verified"></i>' : '');
+                            
+                            const pHandle = document.getElementById('profileHandle');
+                            if (pHandle) pHandle.innerText = window.currentUser.handle;
+                            
+                            const pBio = document.getElementById('profileBio');
+                            if (pBio) pBio.innerText = window.currentUser.bio;
+                            
+                            // Overwrite the fake 2006K followers with their real numbers!
+                            const statsDiv = document.querySelector('.profile-stats');
+                            if (statsDiv) {
+                                const followersCount = window.currentUser.followers ? window.currentUser.followers.length : 0;
+                                const followingCount = window.currentUser.following ? window.currentUser.following.length : 0;
+                                statsDiv.innerHTML = `
+                                    <div><strong>${followingCount}</strong> <span style="color: var(--text-muted);">Following</span></div>
+                                    <div><strong>${followersCount}</strong> <span style="color: var(--text-muted);">Followers</span></div>
+                                `;
+                            }
+                            
+                            // Update their face on the screen
+                            document.querySelectorAll('.profile-avatar-large').forEach(img => img.src = window.currentUser.avatar);
+                            const composerAvatar = document.querySelector('.composer img');
+                            if (composerAvatar) composerAvatar.src = window.currentUser.avatar;
+                        });
+                    }
+                });
+            }
+        }, 1500);
+
+        // --- 54. GLOBAL IMAGE POSTING FIX (BASE64 BYPASS) ---
+        setTimeout(() => {
+            const postBtn = document.querySelector('.btn-post');
+            const postInput = document.getElementById('postInput');
+            // Find the hidden file input used for feed images
+            const imageInput = document.querySelector('input[type="file"]:not(#avatarUploadInput)'); 
+            
+            if (postBtn && postInput) {
+                // Remove old broken click listeners by cloning the button
+                const newBtn = postBtn.cloneNode(true);
+                postBtn.parentNode.replaceChild(newBtn, postBtn);
+                
+                newBtn.addEventListener('click', function() {
+                    const text = postInput.value.trim();
+                    const file = imageInput && imageInput.files ? imageInput.files[0] : null;
+                    
+                    if (!text && !file) return; // Don't post empty stuff
+                    
+                    newBtn.innerText = "Posting...";
+                    
+                    const uploadPostToFirebase = (base64Image) => {
+                        db.collection("global_posts").add({
+                            text: text,
+                            imageUrl: base64Image || "",
+                            authorName: window.currentUser.name || "User",
+                            authorHandle: window.currentUser.handle || "@user",
+                            authorAvatar: window.currentUser.avatar || "",
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            likes: 0,
+                            mediaType: file && file.type.includes('video') ? 'video' : 'image'
+                        }).then(() => {
+                            // Clear the typing box and image preview
+                            postInput.value = '';
+                            if (imageInput) imageInput.value = '';
+                            const preview = document.getElementById('imagePreview');
+                            if (preview) preview.style.display = 'none';
+                            newBtn.innerText = "Post";
+                        }).catch(err => {
+                            console.error("Error posting:", err);
+                            newBtn.innerText = "Post";
+                        });
+                    };
+
+                    // If they attached a picture, convert it to Base64 first!
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => uploadPostToFirebase(e.target.result);
+                        reader.readAsDataURL(file);
+                    } else {
+                        uploadPostToFirebase(null);
+                    }
+                });
+            }
+        }, 2000);
 
 </body>
 </html>
